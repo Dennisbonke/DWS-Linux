@@ -2,32 +2,47 @@
 #include <curl/easy.h>
 #include <gtk/gtk.h>
 #include <libayatana-appindicator/app-indicator.h>
+#include <libnotify/notify.h>
 #include <time.h>
 
 struct MemoryBuffer {
-    char *data;
-    size_t size;
+	char *data;
+	size_t size;
 };
 
 int current_level = -1;
 
+void show_notification(const char *title, const char *body) {
+	NotifyNotification *n;
+
+	if (!notify_is_initted()) {
+		notify_init("DWS_Tray");
+	}
+
+	n = notify_notification_new(title, body, NULL);
+	notify_notification_set_timeout(n, 5000);
+	notify_notification_show(n, NULL);
+
+	g_object_unref(G_OBJECT(n));
+}
+
 static size_t write_callback(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t realsize = size * nmemb;
-    struct MemoryBuffer *mem = (struct MemoryBuffer *)userp;
+	size_t realsize = size * nmemb;
+	struct MemoryBuffer *mem = (struct MemoryBuffer *)userp;
 
-    char *ptr = realloc(mem->data, mem->size + realsize + 1);
-    if (ptr == NULL) {
-        // out of memory
-        fprintf(stderr, "Not enough memory\n");
-        return 0;
-    }
+	char *ptr = realloc(mem->data, mem->size + realsize + 1);
+	if (ptr == NULL) {
+		// out of memory
+		fprintf(stderr, "Not enough memory\n");
+		return 0;
+	}
 
-    mem->data = ptr;
-    memcpy(&(mem->data[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->data[mem->size] = 0;  // null-terminate
+	mem->data = ptr;
+	memcpy(&(mem->data[mem->size]), contents, realsize);
+	mem->size += realsize;
+	mem->data[mem->size] = 0;  // null-terminate
 
-    return realsize;
+	return realsize;
 }
 
 gboolean fetch_dws_status(gpointer user_data) {
@@ -43,7 +58,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 		if(setopt_ret) {
 			// Exit
 		}
-        setopt_ret = curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, (void *)&chunk);
+		setopt_ret = curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, (void *)&chunk);
 		if(setopt_ret) {
 			// Exit
 		}
@@ -52,6 +67,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 			fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 			app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 			app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!");
 		} else {
 			printf("Fetched data: '%s'\n", chunk.data);
 			if(chunk.size == 1) {
@@ -59,30 +75,35 @@ gboolean fetch_dws_status(gpointer user_data) {
 					if(current_level != 1) {
 						app_indicator_set_icon_full(indicator, "defcon1", "DWS DEFCON 1");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 1, Condition code RED");
 						current_level = 1;
 					}
 				} else if(chunk.data[0] == '2') {
 					if(current_level != 2) {
 						app_indicator_set_icon_full(indicator, "defcon2", "DWS DEFCON 2");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 2, Condition code ORANGE");
 						current_level = 2;
 					}
 				} else if(chunk.data[0] == '3') {
 					if(current_level != 3) {
 						app_indicator_set_icon_full(indicator, "defcon3", "DWS DEFCON 3");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 3, Condition code YELLOW");
 						current_level = 3;
 					}
 				} else if(chunk.data[0] == '4') {
 					if(current_level != 4) {
 						app_indicator_set_icon_full(indicator, "defcon4", "DWS DEFCON 4");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 4, Condition code BLUE");
 						current_level = 4;
 					}
 				} else if(chunk.data[0] == '5') {
 					if(current_level != 5) {
 						app_indicator_set_icon_full(indicator, "defcon5", "DWS DEFCON 5");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 5, Condition code GREEN");
 						current_level = 5;
 					}
 				} else {
@@ -90,6 +111,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 					printf("DWS: Invalid data received, size ok but got: '%s'\n", chunk.data);
 					app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 					app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+					show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!");
 					current_level = -1;
 				}
 			} else {
@@ -97,15 +119,17 @@ gboolean fetch_dws_status(gpointer user_data) {
 				printf("DWS: Invalid data received, size too big, got: '%s'\n", chunk.data);
 				app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 				app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+				show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!");
 				current_level = -1;
 			}
 		}
 		curl_easy_cleanup(easy_handle);
-    	free(chunk.data);
+		free(chunk.data);
 	} else {
 		printf("DWS: Failed to initialize curl easy session, resetting icon to no connection.\n");
 		app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 		app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+		show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!");
 		current_level = -1;
 	}
 
@@ -119,24 +143,24 @@ int main(int argc, char **argv) {
 		printf("DWS: Curl global initialization failed, exiting...");
 		exit(EXIT_FAILURE);
 	}
-    gtk_init(&argc, &argv);
+	gtk_init(&argc, &argv);
 
-    AppIndicator *indicator = app_indicator_new(
-        "DWS Tray",
-        "defcon-no-connection",  // Icon from system theme
-        APP_INDICATOR_CATEGORY_APPLICATION_STATUS
-    );
+	AppIndicator *indicator = app_indicator_new(
+		"DWS Tray",
+		"defcon-no-connection",  // Icon from system theme
+		APP_INDICATOR_CATEGORY_APPLICATION_STATUS
+	);
 
-    app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
+	app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
 
-    GtkWidget *menu = gtk_menu_new();
+	GtkWidget *menu = gtk_menu_new();
 
-    GtkWidget *item_quit = gtk_menu_item_new_with_label("Quit");
-    g_signal_connect(item_quit, "activate", G_CALLBACK(gtk_main_quit), NULL);
-    gtk_menu_shell_append(GTK_MENU_SHELL(menu), item_quit);
+	GtkWidget *item_quit = gtk_menu_item_new_with_label("Quit");
+	g_signal_connect(item_quit, "activate", G_CALLBACK(gtk_main_quit), NULL);
+	gtk_menu_shell_append(GTK_MENU_SHELL(menu), item_quit);
 
-    gtk_widget_show_all(menu);
-    app_indicator_set_menu(indicator, GTK_MENU(menu));
+	gtk_widget_show_all(menu);
+	app_indicator_set_menu(indicator, GTK_MENU(menu));
 
 	// Run it once manually
 	fetch_dws_status(indicator);
@@ -145,8 +169,8 @@ int main(int argc, char **argv) {
 	// TODO: Make this configurable
 	g_timeout_add(10000, fetch_dws_status, indicator);
 
-    gtk_main();
+	gtk_main();
 
 	curl_global_cleanup();
-    return 0;
+	return 0;
 }

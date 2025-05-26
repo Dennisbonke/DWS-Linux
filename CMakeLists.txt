@@ -7,10 +7,11 @@ set(CMAKE_C_STANDARD 11)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 pkg_check_modules(AYATANA REQUIRED ayatana-appindicator3-0.1)
+pkg_check_modules(LIBNOTIFY REQUIRED libnotify)
 find_package(CURL REQUIRED)
 
 # Include and link directories
-include_directories(${GTK3_INCLUDE_DIRS} ${AYATANA_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+include_directories(${GTK3_INCLUDE_DIRS} ${AYATANA_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS} ${LIBNOTIFY_INCLUDE_DIRS})
 link_directories(${GTK3_LIBRARY_DIRS} ${AYATANA_LIBRARY_DIRS})
 
 # Add the executable
@@ -21,10 +22,11 @@ target_link_libraries(DWS_Tray
     ${GTK3_LIBRARIES}
     ${AYATANA_LIBRARIES}
     ${CURL_LIBRARIES}
+    ${LIBNOTIFY_LIBRARIES}
 )
 
 # Define compile flags (e.g., for warnings)
-add_definitions(${GTK3_CFLAGS_OTHER} ${AYATANA_CFLAGS_OTHER})
+add_definitions(${GTK3_CFLAGS_OTHER} ${AYATANA_CFLAGS_OTHER} ${LIBNOTIFY_CFLAGS_OTHER})
 
 # Set install locations
 include(GNUInstallDirs)

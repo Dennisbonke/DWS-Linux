@@ -1,9 +1,12 @@
+#include <canberra-gtk.h>
 #include <curl/curl.h>
 #include <curl/easy.h>
 #include <gtk/gtk.h>
 #include <libayatana-appindicator/app-indicator.h>
 #include <libnotify/notify.h>
 #include <time.h>
+
+#include <stdbool.h>
 
 gboolean fetch_dws_status(gpointer user_data);
 
@@ -16,6 +19,26 @@ int current_level = -1;
 
 static guint timeout_seconds = 3600 * 1000; // Default value of 3600 seconds == 1 hour interval
 static guint timeout_source_id = 0;
+
+ca_context *ctx = NULL;
+
+void play_notification_sound(bool alert) {
+	if(!ctx) {
+		ca_context_create(&ctx);
+	}
+
+	if(!alert) {
+		ca_context_play(ctx, 0,
+			CA_PROP_EVENT_ID, "bell-window-system",
+			CA_PROP_APPLICATION_NAME, "DWS Tray",
+			NULL);
+	} else {
+		ca_context_play(ctx, 0,
+			CA_PROP_MEDIA_FILENAME, "/usr/share/dws-tray/sounds/alert.wav",
+			CA_PROP_APPLICATION_NAME, "DWS Tray",
+			NULL);
+	}
+}
 
 void load_config() {
 	GKeyFile *keyfile = g_key_file_new();
@@ -50,7 +73,7 @@ void update_timeout(GSourceFunc func, gpointer data) {
 	timeout_source_id = g_timeout_add(timeout_seconds, func, data);
 }
 
-void show_notification(const char *title, const char *body, const char *icon) {
+void show_notification(const char *title, const char *body, const char *icon, bool alert) {
 	NotifyNotification *n;
 
 	if(!notify_is_initted()) {
@@ -61,6 +84,7 @@ void show_notification(const char *title, const char *body, const char *icon) {
 	n = notify_notification_new(title, body, icon);
 	notify_notification_set_timeout(n, 5000);
 	notify_notification_show(n, NULL);
+	play_notification_sound(alert);
 
 	g_object_unref(G_OBJECT(n));
 }
@@ -108,7 +132,7 @@ GtkWidget *build_menu() {
 
 	for (int i = 0; i < 6; i++) {
 		GtkWidget *item = gtk_radio_menu_item_new_with_label(group, intervals[i].label);
-        group = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(item));
+		group = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(item));
 		// GtkWidget *check = gtk_check_menu_item_new_with_label(intervals[i].label);
 		
 		// Check current value
@@ -161,7 +185,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 			// Failed to set options, fall back to no connection
 			app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 			app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 			current_level = -1;
 			curl_easy_cleanup(easy_handle);
 			return TRUE;
@@ -171,7 +195,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 			// Failed to set options, fall back to no connection
 			app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 			app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 			current_level = -1;
 			curl_easy_cleanup(easy_handle);
 			return TRUE;
@@ -181,7 +205,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 			// Failed to set options, fall back to no connection
 			app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 			app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 			current_level = -1;
 			curl_easy_cleanup(easy_handle);
 			return TRUE;
@@ -191,7 +215,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 			fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
 			app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 			app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+			show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 			current_level = -1;
 		} else {
 			printf("Fetched data: '%s'\n", chunk.data);
@@ -200,35 +224,35 @@ gboolean fetch_dws_status(gpointer user_data) {
 					if(current_level != 1) {
 						app_indicator_set_icon_full(indicator, "defcon1", "DWS DEFCON 1");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-						show_notification("DEFCON STATUS UPDATE", "DEFCON 1, Condition code RED", "defcon1");
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 1, Condition code RED", "defcon1", true);
 						current_level = 1;
 					}
 				} else if(chunk.data[0] == '2') {
 					if(current_level != 2) {
 						app_indicator_set_icon_full(indicator, "defcon2", "DWS DEFCON 2");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-						show_notification("DEFCON STATUS UPDATE", "DEFCON 2, Condition code ORANGE", "defcon2");
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 2, Condition code ORANGE", "defcon2", true);
 						current_level = 2;
 					}
 				} else if(chunk.data[0] == '3') {
 					if(current_level != 3) {
 						app_indicator_set_icon_full(indicator, "defcon3", "DWS DEFCON 3");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-						show_notification("DEFCON STATUS UPDATE", "DEFCON 3, Condition code YELLOW", "defcon3");
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 3, Condition code YELLOW", "defcon3", false);
 						current_level = 3;
 					}
 				} else if(chunk.data[0] == '4') {
 					if(current_level != 4) {
 						app_indicator_set_icon_full(indicator, "defcon4", "DWS DEFCON 4");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-						show_notification("DEFCON STATUS UPDATE", "DEFCON 4, Condition code BLUE", "defcon4");
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 4, Condition code BLUE", "defcon4", false);
 						current_level = 4;
 					}
 				} else if(chunk.data[0] == '5') {
 					if(current_level != 5) {
 						app_indicator_set_icon_full(indicator, "defcon5", "DWS DEFCON 5");
 						app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-						show_notification("DEFCON STATUS UPDATE", "DEFCON 5, Condition code GREEN", "defcon5");
+						show_notification("DEFCON STATUS UPDATE", "DEFCON 5, Condition code GREEN", "defcon5", false);
 						current_level = 5;
 					}
 				} else {
@@ -236,7 +260,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 					printf("DWS: Invalid data received, size ok but got: '%s'\n", chunk.data);
 					app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 					app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-					show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+					show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 					current_level = -1;
 				}
 			} else {
@@ -244,7 +268,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 				printf("DWS: Invalid data received, size too big, got: '%s'\n", chunk.data);
 				app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 				app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-				show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+				show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 				current_level = -1;
 			}
 		}
@@ -254,7 +278,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 		printf("DWS: Failed to initialize curl easy session, resetting icon to no connection.\n");
 		app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
 		app_indicator_set_status(indicator, APP_INDICATOR_STATUS_ACTIVE);
-		show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection");
+		show_notification("DEFCON STATUS UPDATE", "Failed to connect to DWS servers!", "defcon-no-connection", false);
 		current_level = -1;
 	}
 
@@ -291,6 +315,11 @@ int main(int argc, char **argv) {
 	update_timeout(fetch_dws_status, NULL);
 
 	gtk_main();
+
+	if(ctx) {
+		ca_context_destroy(ctx);
+		ctx = NULL;
+	}
 
 	curl_global_cleanup();
 	notify_uninit();

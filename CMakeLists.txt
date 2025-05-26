@@ -8,10 +8,11 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
 pkg_check_modules(AYATANA REQUIRED ayatana-appindicator3-0.1)
 pkg_check_modules(LIBNOTIFY REQUIRED libnotify)
+pkg_check_modules(CANBERRA REQUIRED libcanberra-gtk3)
 find_package(CURL REQUIRED)
 
 # Include and link directories
-include_directories(${GTK3_INCLUDE_DIRS} ${AYATANA_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS} ${LIBNOTIFY_INCLUDE_DIRS})
+include_directories(${GTK3_INCLUDE_DIRS} ${AYATANA_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS} ${LIBNOTIFY_INCLUDE_DIRS} ${CANBERRA_INCLUDE_DIRS})
 link_directories(${GTK3_LIBRARY_DIRS} ${AYATANA_LIBRARY_DIRS})
 
 # Add the executable
@@ -23,6 +24,7 @@ target_link_libraries(DWS_Tray
     ${AYATANA_LIBRARIES}
     ${CURL_LIBRARIES}
     ${LIBNOTIFY_LIBRARIES}
+    ${CANBERRA_LIBRARIES}
 )
 
 # Define compile flags (e.g., for warnings)
@@ -69,6 +71,9 @@ configure_file(${CMAKE_SOURCE_DIR}/dws_tray.desktop.in
 # Install .desktop file
 install(FILES ${CMAKE_BINARY_DIR}/dws_tray.desktop
         DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/applications)
+
+# Install sound file
+install(FILES sounds/alert.wav DESTINATION share/dws-tray/sounds)
 
 # Configure uninstall script
 configure_file(

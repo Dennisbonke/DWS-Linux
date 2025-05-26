@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=DWS Tray
+Comment=An app that displays the current DEFCON level as determined by the DefconWarningSystem
+Exec=@EXECUTABLE_PATH@
+Icon=tray_icon
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true

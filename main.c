@@ -70,8 +70,7 @@ void on_interval_selected(GtkCheckMenuItem *item, gpointer user_data) {
 		return;
 	}
 
-	guint *new_val = (guint *)user_data;
-	timeout_seconds = *new_val;
+	timeout_seconds = GPOINTER_TO_UINT(user_data);
 
 	save_config();
 	update_timeout(fetch_dws_status, NULL);
@@ -84,8 +83,6 @@ void on_interval_selected(GtkCheckMenuItem *item, gpointer user_data) {
 			gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(l->data), FALSE);
 	}
 	g_list_free(children);
-
-	g_free(user_data);
 }
 
 GtkWidget *build_menu() {
@@ -107,21 +104,21 @@ GtkWidget *build_menu() {
 		{ "Every hour (the default)", 60 * 60 * 1000 },
 	};
 
+	GSList *group = NULL;
+
 	for (int i = 0; i < 6; i++) {
-		GtkWidget *check = gtk_check_menu_item_new_with_label(intervals[i].label);
+		GtkWidget *item = gtk_radio_menu_item_new_with_label(group, intervals[i].label);
+        group = gtk_radio_menu_item_get_group(GTK_RADIO_MENU_ITEM(item));
+		// GtkWidget *check = gtk_check_menu_item_new_with_label(intervals[i].label);
 		
 		// Check current value
 		if (timeout_seconds == intervals[i].value) {
-			gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(check), TRUE);
+			gtk_check_menu_item_set_active(GTK_CHECK_MENU_ITEM(item), TRUE);
 		}
 
-		// Set callback with interval value
-		guint *val = g_new(guint, 1);
-		*val = intervals[i].value;
+		g_signal_connect(item, "toggled", G_CALLBACK(on_interval_selected), GINT_TO_POINTER(intervals[i].value));
 
-		g_signal_connect(check, "activate", G_CALLBACK(on_interval_selected), val);
-
-		gtk_menu_shell_append(GTK_MENU_SHELL(submenu), check);
+		gtk_menu_shell_append(GTK_MENU_SHELL(submenu), item);
 	}
 
 	gtk_menu_item_set_submenu(GTK_MENU_ITEM(update_item), submenu);

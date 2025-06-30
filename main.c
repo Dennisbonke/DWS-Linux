@@ -4,9 +4,14 @@
 #include <gtk/gtk.h>
 #include <libayatana-appindicator/app-indicator.h>
 #include <libnotify/notify.h>
+#include <string.h>
 #include <time.h>
 
 #include <stdbool.h>
+
+#define FETCH_URL "https://defconwarningsystem.com/code.dat"
+
+AppIndicator *indicator = NULL;
 
 gboolean fetch_dws_status(gpointer user_data);
 
@@ -180,7 +185,7 @@ gboolean fetch_dws_status(gpointer user_data) {
 	CURL *easy_handle = curl_easy_init();
 	if(easy_handle) {
 		struct MemoryBuffer chunk = {0};
-		CURLcode setopt_ret = curl_easy_setopt(easy_handle, CURLOPT_URL, "https://defconwarningsystem.com/code.dat");
+		CURLcode setopt_ret = curl_easy_setopt(easy_handle, CURLOPT_URL, FETCH_URL);
 		if(setopt_ret) {
 			// Failed to set options, fall back to no connection
 			app_indicator_set_icon_full(indicator, "defcon-no-connection", "DWS No Connection");
@@ -298,7 +303,7 @@ int main(int argc, char **argv) {
 	load_config();
 	gtk_init(&argc, &argv);
 
-	AppIndicator *indicator = app_indicator_new(
+	indicator = app_indicator_new(
 		"DWS Tray",
 		"defcon-no-connection",  // Icon from system theme
 		APP_INDICATOR_CATEGORY_APPLICATION_STATUS
@@ -312,7 +317,7 @@ int main(int argc, char **argv) {
 	// Run it once manually
 	fetch_dws_status(indicator);
 
-	update_timeout(fetch_dws_status, NULL);
+	update_timeout(fetch_dws_status, indicator);
 
 	gtk_main();
 
